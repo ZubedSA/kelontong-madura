@@ -25,7 +25,7 @@ export default function TabunganPage() {
 
   // States for Settings Modal
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [settingsForm, setSettingsForm] = useState({
+  const [settingsForm, setSettingsForm] = useState<{ savingsType: string; savingsValue: number | string }>({
     savingsType: 'FIXED',
     savingsValue: 0,
   });
