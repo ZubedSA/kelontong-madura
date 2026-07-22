@@ -1,0 +1,6 @@
+UnauthorizedException: Kredensial tidak valid
+    at AuthService.login (D:\WEB\Warung Kelontong Madura\backend\src\auth\auth.service.ts:34:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async AuthController.login (D:\WEB\Warung Kelontong Madura\backend\src\auth\auth.controller.ts:13:14)
+    at async D:\WEB\Warung Kelontong Madura\backend\node_modules\@nestjs\core\router\router-execution-context.js:47:62
+    at async D:\WEB\Warung Kelontong Madura\backend\node_modules\@nestjs\core\router\router-proxy.js:9:17

@@ -1,0 +1,251 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// -----------------------------------------------------------------------------
+// GLOBAL ENUMS
+// -----------------------------------------------------------------------------
+enum GlobalRole {
+  SUPER_ADMIN
+  USER
+}
+
+enum TenantRole {
+  JURAGAN
+  PENJAGA
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  INACTIVE
+}
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
+}
+
+enum TransactionType {
+  INCOME       // Pemasukan / Omzet
+  RESTOCK      // Belanja Stok (Uang keluar jadi barang)
+  EXPENSE      // Pengeluaran Operasional
+  SAVINGS      // Tabungan (Uang disisihkan)
+}
+
+enum SavingsType {
+  PERCENTAGE
+  FIXED
+}
+
+enum SummaryStatus {
+  DRAFT
+  FINAL
+  REVISION_REQUESTED
+}
+
+// -----------------------------------------------------------------------------
+// GLOBAL SAAS TABLES
+// -----------------------------------------------------------------------------
+model User {
+  id           String      @id @default(uuid()) @db.Uuid
+  email        String      @unique
+  passwordHash String      @map("password_hash")
+  name         String
+  globalRole   GlobalRole  @default(USER) @map("global_role")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  tenantUsers  TenantUser[]
+  auditLogs    AuditLog[]
+}
+
+model Tenant {
+  id        String       @id @default(uuid()) @db.Uuid
+  name      String       // Nama Toko/Usaha
+  subdomain String?      @unique
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  // Relasi
+  users             TenantUser[]
+  warungs           Warung[]
+  shifts            Shift[]
+  transactions      Transaction[]
+  dailySummaries    DailySummary[]
+  financialSettings FinancialSetting?
+  auditLogs         AuditLog[]
+  assetAudits       AssetAudit[]
+  salaryHistories   SalaryHistory[]
+}
+
+// -----------------------------------------------------------------------------
+// TENANT-ISOLATED TABLES (Wajib Memiliki tenant_id)
+// -----------------------------------------------------------------------------
+
+// Mapping User to Tenant
+model TenantUser {
+  id         String     @id @default(uuid()) @db.Uuid
+  tenantId   String     @map("tenant_id") @db.Uuid
+  userId     String     @map("user_id") @db.Uuid
+  role       TenantRole
+  baseModal  Float      @default(0) @map("base_modal") // Modal Awal harian yang diberikan ke penjaga ini
+  baseSalary Float      @default(0) @map("base_salary") // Gaji pokok atau persentase bagi hasil
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  shifts Shift[] // Karyawan yang buka shift
+  assetAudits AssetAudit[]
+
+  @@unique([tenantId, userId])
+}
+
+// Cabang Warung
+model Warung {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String
+  address   String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  shifts         Shift[]
+  transactions   Transaction[]
+  dailySummaries DailySummary[]
+}
+
+// Pengaturan Keuangan per Tenant
+model FinancialSetting {
+  id                   String      @id @default(uuid()) @db.Uuid
+  tenantId             String      @unique @map("tenant_id") @db.Uuid
+  savingsType          SavingsType @default(FIXED) @map("savings_type")
+  savingsValue         Float       @default(0) @map("savings_value") // Nominal atau Persentase
+  profitShareJuragan   Float       @default(100) @map("profit_share_juragan")
+  profitSharePenjaga   Float       @default(0) @map("profit_share_penjaga")
+  updatedAt            DateTime    @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+}
+
+// Sesi Kerja Penjaga
+model Shift {
+  id           String      @id @default(uuid()) @db.Uuid
+  tenantId     String      @map("tenant_id") @db.Uuid
+  warungId     String      @map("warung_id") @db.Uuid
+  tenantUserId String      @map("tenant_user_id") @db.Uuid // Penjaga
+  startTime    DateTime    @default(now()) @map("start_time")
+  endTime      DateTime?   @map("end_time")
+  startCash    Float       @default(0) @map("start_cash") // Modal Awal laci kasir saat buka shift
+  status       ShiftStatus @default(OPEN)
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  warung       Warung        @relation(fields: [warungId], references: [id], onDelete: Restrict)
+  tenantUser   TenantUser    @relation(fields: [tenantUserId], references: [id], onDelete: Restrict)
+  transactions Transaction[]
+
+  @@index([tenantId, status])
+}
+
+// Entri Harian (Omzet, Belanja, Operasional)
+model Transaction {
+  id          String          @id @default(uuid()) @db.Uuid
+  tenantId    String          @map("tenant_id") @db.Uuid
+  warungId    String          @map("warung_id") @db.Uuid
+  shiftId     String          @map("shift_id") @db.Uuid
+  type        TransactionType
+  amount      Float
+  description String?
+  isEdited    Boolean         @default(false) @map("is_edited")
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  warung Warung @relation(fields: [warungId], references: [id], onDelete: Restrict)
+  shift  Shift  @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, shiftId, createdAt])
+}
+
+// Rekapan Saat Tutup Hari
+model DailySummary {
+  id               String        @id @default(uuid()) @db.Uuid
+  tenantId         String        @map("tenant_id") @db.Uuid
+  warungId         String        @map("warung_id") @db.Uuid
+  summaryDate      DateTime      @db.Date @map("summary_date")
+  totalIncome      Float         @default(0) @map("total_income")
+  totalRestock     Float         @default(0) @map("total_restock")
+  totalExpense     Float         @default(0) @map("total_expense")
+  targetSavings    Float         @default(0) @map("target_savings")
+  status           SummaryStatus @default(DRAFT)
+  isEdited         Boolean       @default(false) @map("is_edited")
+  createdAt        DateTime      @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  warung Warung @relation(fields: [warungId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, summaryDate])
+}
+
+// Immutable Audit Log
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String?  @map("tenant_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String   // e.g., "CREATE_TRANSACTION", "CLOSE_SHIFT"
+  entityName String   @map("entity_name")
+  entityId   String?  @map("entity_id") @db.Uuid
+  oldData    Json?    @map("old_data")
+  newData    Json?    @map("new_data")
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+// Riwayat Opname / Audit Aset
+model AssetAudit {
+  id           String      @id @default(uuid()) @db.Uuid
+  tenantId     String      @map("tenant_id") @db.Uuid
+  tenantUserId String      @map("tenant_user_id") @db.Uuid // Penjaga
+  auditDate    DateTime    @default(now()) @map("audit_date")
+  modalAwal    Float       @map("modal_awal")
+  uangFisik    Float       @map("uang_fisik")
+  nilaiBarang  Float       @map("nilai_barang")
+  totalAset    Float       @map("total_aset")
+  selisih      Float
+  porsiJuragan Float       @map("porsi_juragan")
+  porsiPenjaga Float       @map("porsi_penjaga")
+  hakJuragan   Float       @map("hak_juragan")
+  hakPenjaga   Float       @map("hak_penjaga")
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  tenantUser   TenantUser  @relation(fields: [tenantUserId], references: [id], onDelete: Restrict)
+}
+
+// Rekapan / Riwayat Gaji Bulanan
+model SalaryHistory {
+  id           String      @id @default(uuid()) @db.Uuid
+  tenantId     String      @map("tenant_id") @db.Uuid
+  month        Int
+  year         Int
+  totalSavings Float       @map("total_savings")
+  porsiJuragan Float       @map("porsi_juragan")
+  porsiPenjaga Float       @map("porsi_penjaga")
+  gajiPenjaga  Float       @map("gaji_penjaga")
+  hakJuragan   Float       @map("hak_juragan")
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, month, year])
+}
