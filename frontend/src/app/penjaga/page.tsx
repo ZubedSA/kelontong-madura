@@ -193,7 +193,7 @@ export default function PenjagaDashboard() {
             </p>
             <h1 className="text-white text-2xl font-bold tracking-tight">Halo, {user?.name || 'Karyawan'}!</h1>
             {activeShift && (
-              <p className="text-indigo-100 text-xs mt-2">{activeShift.warung?.name || 'Toko'} - Mulai: {new Date(activeShift.startTime).toLocaleTimeString()}</p>
+              <p className="text-indigo-100 text-xs mt-2">{activeShift.warung?.name || 'Toko'} - Mulai: {new Date(activeShift.startTime).toLocaleTimeString('id-ID', {timeZone: 'Asia/Jakarta'})} WIB</p>
             )}
           </div>
           <button onClick={handleLogout} className="bg-white/20 p-2 rounded-full text-white hover:bg-white/30 transition">
@@ -314,7 +314,7 @@ export default function PenjagaDashboard() {
                           {tx.type === 'INCOME' ? '+' : '-'} Rp {tx.amount.toLocaleString('id-ID')}
                         </p>
                         <p className="text-[10px] text-slate-400">
-                          {new Date(tx.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          {new Date(tx.createdAt).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit', timeZone: 'Asia/Jakarta'})} WIB
                         </p>
                       </div>
                     </div>
@@ -386,7 +386,7 @@ export default function PenjagaDashboard() {
                            tx.type === 'RESTOCK' ? 'Belanja Stok' :
                            tx.type === 'EXPENSE' ? 'Operasional' : 'Tabungan'}
                         </p>
-                        <p className="text-xs text-slate-500">{new Date(tx.createdAt).toLocaleDateString('id-ID', {day: '2-digit', month: 'short'})} {new Date(tx.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                        <p className="text-xs text-slate-500">{new Date(tx.createdAt).toLocaleDateString('id-ID', {day: '2-digit', month: 'short', timeZone: 'Asia/Jakarta'})} {new Date(tx.createdAt).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit', timeZone: 'Asia/Jakarta'})} WIB</p>
                       </div>
                     </div>
                     <div className="text-right">
@@ -417,9 +417,15 @@ export default function PenjagaDashboard() {
                   <AlertCircle className="w-8 h-8" />
                 </div>
                 <h3 className="text-xl font-bold text-slate-800 mb-2">Tutup Shift?</h3>
-                <p className="text-slate-500 text-sm mb-6">
-                  Apakah Anda yakin ingin menutup shift hari ini? Anda harus menyetor hasil dan tidak bisa mencatat transaksi lagi untuk shift ini.
+                <p className="text-slate-500 text-sm mb-4">
+                  Apakah Anda yakin ingin menutup shift hari ini? Anda harus menyetor hasil dan tidak bisa mencatat transaksi lagi.
                 </p>
+                <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl mb-6 text-left flex items-start gap-2">
+                  <span className="text-amber-500 text-lg">⚠️</span>
+                  <p className="text-amber-800 text-xs font-semibold">
+                    Perhatian: Setiap penjaga hanya bisa membuka dan menutup shift 1 kali dalam sehari. Jika ditutup, Anda baru bisa membuka shift lagi besok.
+                  </p>
+                </div>
                 <div className="flex gap-3">
                   <button 
                     onClick={() => setIsModalOpen(false)}

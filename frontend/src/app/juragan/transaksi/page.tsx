@@ -200,7 +200,7 @@ export default function TransaksiPage() {
                       )}
                     </p>
                     <p className="text-xs md:text-sm text-slate-500">
-                      {new Date(trx.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })} • {new Date(trx.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} 
+                      {new Date(trx.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta' })} • {new Date(trx.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })} WIB
                       <span className="ml-2 px-2 py-0.5 bg-slate-100 rounded-md text-[10px] font-semibold text-slate-500">
                         Penjaga: {trx.shift?.tenantUser?.user?.name || 'Tidak diketahui'}
                       </span>
