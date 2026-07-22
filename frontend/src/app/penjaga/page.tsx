@@ -21,6 +21,11 @@ export default function PenjagaDashboard() {
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   
+  // States for History
+  const [historyStartDate, setHistoryStartDate] = useState('');
+  const [historyEndDate, setHistoryEndDate] = useState('');
+  const [historyType, setHistoryType] = useState('');
+  
   const queryClient = useQueryClient();
 
   // Queries
@@ -34,6 +39,22 @@ export default function PenjagaDashboard() {
 
   const activeShift = shiftData?.data;
   const tenantSettings = shiftData?.settings;
+
+  const { data: historyData } = useQuery({
+    queryKey: ['my-history', historyStartDate, historyEndDate, historyType],
+    queryFn: async () => {
+      let url = '/transactions';
+      const params = new URLSearchParams();
+      if (historyStartDate) params.append('startDate', historyStartDate);
+      if (historyEndDate) params.append('endDate', historyEndDate);
+      if (historyType) params.append('type', historyType);
+      const queryStr = params.toString();
+      if (queryStr) url += `?${queryStr}`;
+      
+      const res = await api.get(url);
+      return res.data;
+    }
+  });
 
   let omzet = 0;
   if (activeShift && activeShift.transactions) {
@@ -52,8 +73,8 @@ export default function PenjagaDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['active-shift'] });
     },
-    onError: () => {
-      toastError('Gagal membuka shift');
+    onError: (error: any) => {
+      toastError(error.response?.data?.message || 'Gagal membuka shift');
     }
   });
 
@@ -163,7 +184,7 @@ export default function PenjagaDashboard() {
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
-      <div className="bg-indigo-600 px-6 py-8 rounded-b-3xl shadow-md relative overflow-hidden">
+      <div className="bg-indigo-600 px-6 pt-8 pb-12 rounded-b-3xl shadow-md relative overflow-hidden">
         <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full bg-white opacity-10"></div>
         <div className="flex justify-between items-start relative z-10">
           <div>
@@ -182,8 +203,8 @@ export default function PenjagaDashboard() {
       </div>
 
       {!activeShift ? (
-        <div className="flex-1 flex flex-col items-center justify-center px-6 -mt-10 relative z-20">
-          <div className="bg-white rounded-3xl shadow-xl p-8 border border-slate-100 max-w-sm w-full text-center">
+        <div className="flex-1 flex flex-col items-center px-6 -mt-8 relative z-20 pb-10">
+          <div className="bg-white rounded-3xl shadow-xl p-8 border border-slate-100 max-w-sm w-full text-center mb-8">
             <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6">
               <RefreshCw className="w-10 h-10 text-indigo-500" />
             </div>
@@ -254,9 +275,9 @@ export default function PenjagaDashboard() {
               </button>
             </div>
             
-            {/* Riwayat Belanja / Transaksi */}
+            {/* Riwayat Belanja / Transaksi Berjalan */}
             <div id="riwayat" className="mt-8">
-              <h3 className="text-slate-800 font-bold mb-4">Riwayat Transaksi</h3>
+              <h3 className="text-slate-800 font-bold mb-4">Transaksi Shift Ini</h3>
               {activeShift.transactions && activeShift.transactions.length > 0 ? (
                 <div className="space-y-3 max-h-64 overflow-y-auto pb-4 pr-2">
                   {activeShift.transactions.map((tx: any, idx: number) => (
@@ -301,13 +322,90 @@ export default function PenjagaDashboard() {
                 </div>
               ) : (
                 <div className="text-center py-6 bg-slate-100/50 rounded-2xl border border-slate-100 border-dashed">
-                  <p className="text-slate-500 text-sm">Belum ada transaksi</p>
+                  <p className="text-slate-500 text-sm">Belum ada transaksi di shift ini</p>
                 </div>
               )}
             </div>
           </div>
         </>
       )}
+
+      {/* Riwayat Transaksi Global (Selalu Muncul) */}
+      <div className={`px-6 pb-10 ${activeShift ? 'mt-4' : ''}`}>
+        <div className="w-full max-w-lg mx-auto bg-white rounded-3xl shadow-md p-6 border border-slate-100">
+          <h3 className="text-slate-800 font-bold mb-4">Riwayat Semua Transaksi</h3>
+          
+          <div className="flex flex-col gap-3 mb-6">
+            <div className="flex items-center gap-2 w-full">
+              <input 
+                type="date"
+                value={historyStartDate}
+                onChange={(e) => setHistoryStartDate(e.target.value)}
+                className="px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 flex-1 w-full"
+              />
+              <span className="text-slate-400 font-bold">-</span>
+              <input 
+                type="date"
+                value={historyEndDate}
+                onChange={(e) => setHistoryEndDate(e.target.value)}
+                className="px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 flex-1 w-full"
+              />
+            </div>
+            
+            <select
+              value={historyType}
+              onChange={(e) => setHistoryType(e.target.value)}
+              className="w-full px-4 py-3 bg-indigo-50/50 border border-indigo-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-900"
+            >
+              <option value="">Semua Jenis Transaksi</option>
+              <option value="INCOME">Omzet Harian</option>
+              <option value="RESTOCK">Belanja Stok</option>
+              <option value="EXPENSE">Pengeluaran Operasional</option>
+              <option value="SAVINGS">Tabungan</option>
+            </select>
+          </div>
+
+          {historyData?.data && historyData.data.length > 0 ? (
+              <div className="space-y-3 max-h-96 overflow-y-auto pb-2 pr-1 hide-scrollbar">
+                {historyData.data.map((tx: any, idx: number) => (
+                  <div key={idx} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between items-center">
+                    <div className="flex items-center">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 shrink-0 ${
+                        tx.type === 'INCOME' ? 'bg-emerald-100 text-emerald-600' :
+                        tx.type === 'RESTOCK' ? 'bg-amber-100 text-amber-600' :
+                        tx.type === 'EXPENSE' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'
+                      }`}>
+                        {tx.type === 'INCOME' && '💰'}
+                        {tx.type === 'RESTOCK' && '📦'}
+                        {tx.type === 'EXPENSE' && '💸'}
+                        {tx.type === 'SAVINGS' && '🏦'}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-800 flex items-center">
+                          {tx.type === 'INCOME' ? 'Omzet Harian' :
+                           tx.type === 'RESTOCK' ? 'Belanja Stok' :
+                           tx.type === 'EXPENSE' ? 'Operasional' : 'Tabungan'}
+                        </p>
+                        <p className="text-xs text-slate-500">{new Date(tx.createdAt).toLocaleDateString('id-ID', {day: '2-digit', month: 'short'})} {new Date(tx.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-sm font-bold ${
+                        tx.type === 'INCOME' ? 'text-emerald-600' : 'text-slate-700'
+                      }`}>
+                        {tx.type === 'INCOME' ? '+' : '-'} Rp {tx.amount.toLocaleString('id-ID')}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
+                <p className="text-slate-500 text-sm">Tidak ada transaksi di rentang tanggal ini</p>
+              </div>
+            )}
+        </div>
+      </div>
 
       {/* Modals */}
       {isModalOpen && (
